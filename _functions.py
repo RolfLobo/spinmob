@@ -1140,7 +1140,7 @@ def generate_fake_data(f='2*x-5', x=_n.linspace(-5,5,11), ey=1, ex=0, include_er
     
     # Get the x and y exact values first, then randomize
     x = _n.array(x) 
-    y = fitty.f[0](x)
+    y = fitty.functions[0](x)
     
     x = _n.random.normal(_n.array(x),ex)
     y = _n.random.normal(y,          ey)
