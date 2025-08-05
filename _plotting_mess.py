@@ -625,6 +625,10 @@ def xy_data(xdata, ydata, eydata=None, exdata=None, label=None, xlabel='', ylabe
 
     See matplotlib's errorbar() function for additional optional keyword arguments.
     """
+
+    # Create the style cycle from a dictionary
+    if type(style) == dict: style = plot_style_cycle(**style)
+
     _pylab.ioff()
 
     # Make sure the dimensionality of the data sets matches
