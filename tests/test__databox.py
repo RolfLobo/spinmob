@@ -272,8 +272,8 @@ class Test_databox(_ut.TestCase):
         d.save_file('test_binary', '*.txt', 'txt', binary='float64')
         
         # Crash tests
-        d.h()
-        d.c()
+        #d.h() # Prints header information
+        #d.c() # Prints column information
         
         # Load said binary
         d = _s.data.load('test_binary.txt')

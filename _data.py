@@ -1535,7 +1535,7 @@ class databox:
         """
         # If not arguments, print everything
         if len(args) + len(kwargs) == 0:
-            print("Headers")
+            print('Headers')
             for n in range(len(self.hkeys)):
                 print('  '+str(n)+': '+str(self.hkeys[n])+' = '+repr(self.h(n)))
             return
