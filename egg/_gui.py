@@ -2304,8 +2304,7 @@ class TabArea(BaseObject):
 
 class Table(BaseObject):
     """
-    Simplified QTableWidget. This is not a commonly used object. If you need
-    features let Jack know.
+    Simplified QTableWidget. This is not a commonly used object.
 
     Parameters
     ----------
@@ -3236,7 +3235,7 @@ class TreeDictionary(BaseObject):
 
         default_list_index=0
             When setting value=[], use this to specify the default selected
-            list index.
+            list index (an integer)
 
         signal_changed=None
             Optional function to which signal_changed for this parameter will connect.
@@ -3303,37 +3302,40 @@ class TreeDictionary(BaseObject):
         See pyqtgraph ParameterTree for more options. Particularly useful is the
         tip='insert your text' option, which supplies a tooltip!
         """
-
+        
         # Check for limits (should be bounds)
-        if 'limits' in kwargs:
-            print('ParameterTree.add_parameter() WARNING: Please specify bounds rather than limits moving forward, to match changes in pyqtgraph API.')
-            kwargs['bounds'] = kwargs.pop('limits')
+        # Actually, now they went back to 'limits' for everything.
+        # This is now a compatibility layer for different versions.
+        if 'limits' in kwargs: kwargs['bounds'] = kwargs['limits']
 
         # update the default kwargs
         other_kwargs = dict(type=None) # Set type=None by default
         other_kwargs.update(kwargs)    # Slap on the ones we specified
 
         # Special case: we send a list to value => list
-        if type(value)==list: other_kwargs['values'] = value
+        if type(value)==list: 
+            other_kwargs['values'] = value
 
         # Auto typing for lists specified by either method
-        if 'values' in other_kwargs:
-            other_kwargs['type'] = 'list'
-            if default_list_index < len(other_kwargs['values']):
-                value = other_kwargs['values'][default_list_index]
+        if 'values' in other_kwargs: other_kwargs['type'] = 'list'
 
         # Normal autotyping
         elif other_kwargs['type'] == None: other_kwargs['type'] = type(value).__name__
 
         # Fix 'values' for list objects to be only strings
         if other_kwargs['type'] == 'list' or 'values' in other_kwargs:
+            
+            # Make everything strings
             for n in range(len(other_kwargs['values'])):
                 other_kwargs['values'][n] = str(other_kwargs['values'][n])
+
+            # Get the default value from default_list_index
+            if default_list_index < len(other_kwargs['values']):
+                value = other_kwargs['values'][default_list_index]
 
         # Now that the type is determined, set up other options
         if other_kwargs['type'] in ['int', 'float']:
             other_kwargs['compactHeight'] = False
-
 
         # split into (presumably existing) branches and parameter
         s = key.split('/')
@@ -3354,10 +3356,22 @@ class TreeDictionary(BaseObject):
             self.print_message('Error: Could not create \''+key+'\'')
             return self
 
+        # JACK
+        #print('+++', repr(key), repr(value), other_kwargs)
+
+        # Compatibility with old and new pyqtgraph api's. 
+        # New is "limits" instead of "values" for lists
+        if 'values' in other_kwargs: other_kwargs['limits'] = other_kwargs['values']
+
         # create the leaf object
         leaf = _pg.parametertree.Parameter.create(name=p, value=value, syncExpanded=True, **other_kwargs)
         if self.name: self._tree_widgets['/'+self.name+'/'+key] = leaf
         else:         self._tree_widgets[                  key] = leaf
+
+        # JACK
+        # print(leaf)
+        # global thing 
+        # thing = leaf
 
         # add it to the tree (different methods for root)
         if b == self._widget: b.addParameters(leaf)
@@ -4920,7 +4934,7 @@ class DataboxPlot(_d.databox, GridLayout):
             else:
                 kw = dict(pen=_pg.mkPen(color=(i,len(y)), width=_s.settings['egg_pen_width']))
 
-            # Append the curve @JACK
+            # Append the curve
             self._curves.append(_pg.PlotDataItem(**kw))
             if ey[i] is None:
                 self._errors.append(None)
@@ -5544,13 +5558,10 @@ class DataboxSaveLoad(_d.databox, GridLayout):
 
 
 if __name__ == '__main__':
-    import spinmob
-    #runfile(spinmob.__path__[0] + '/tests/test__egg.py')
-
+    
     w = Window()
-    ts = w.add(TabArea())
-    t = ts.add('test')
-    p = t.add(DataboxPlot())
+    s = w.add(TreeDictionary().set_width(200))
+    c = s.add('c', [1,'pants',3], default_list_index=2)
 
     w.show()
 
