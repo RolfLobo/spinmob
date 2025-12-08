@@ -272,7 +272,6 @@ class Test_databox(_ut.TestCase):
         d.save_file('test_binary', '*.txt', 'txt', binary='float64')
         
         # Crash tests
-        print()
         d.h()
         d.c()
         

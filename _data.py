@@ -587,7 +587,7 @@ class databox:
             else:                      delimiter = self.delimiter
 
         # figure out the temporary path
-        temporary_path = _os.path.join(_s.settings.path_home, "temp-"+str(int(1e3*_time.time()))+'-'+str(int(1e9*_n.random.rand(1))))
+        temporary_path = _os.path.join(_s.settings.path_home, "temp-"+str(int(1e3*_time.time()))+'-'+str(int(1e9*_n.random.rand())))
 
         # open the temporary file
         f = open(temporary_path, 'w')
@@ -675,7 +675,7 @@ class databox:
                 for n in range(len(self.ckeys)):
 
                     # Get the binary data string
-                    data_string = _n.array(self[n]).astype(binary).tostring()
+                    data_string = _n.array(self[n]).astype(binary).tobytes()
 
                     # Write the column
                     #  ckey + delimiter + count + \n + datastring + \n
