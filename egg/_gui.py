@@ -26,6 +26,9 @@ _a = _pg.mkQApp()
 if int(_pg.__version__.split('.')[1]) > 12: _qt_widgets = _pg.Qt.QtWidgets
 else:                                       _qt_widgets = _pg.Qt.QtGui
 
+# Test variable for monkeywork
+_x = None
+
 ################################
 # PATCH THROUGH pyqtgraph 13.1 #
 ################################
@@ -3313,25 +3316,25 @@ class TreeDictionary(BaseObject):
         other_kwargs.update(kwargs)    # Slap on the ones we specified
 
         # Special case: we send a list to value => list
-        if type(value)==list: 
-            other_kwargs['values'] = value
-
-        # Auto typing for lists specified by either method
-        if 'values' in other_kwargs: other_kwargs['type'] = 'list'
-
-        # Normal autotyping
-        elif other_kwargs['type'] == None: other_kwargs['type'] = type(value).__name__
-
-        # Fix 'values' for list objects to be only strings
-        if other_kwargs['type'] == 'list' or 'values' in other_kwargs:
+        if type(value) in (list,tuple): other_kwargs['values'] = [str(v) for v in value] # Transfer it to the list
             
-            # Make everything strings
+        # Auto typing for lists specified by either method
+        if 'values' in other_kwargs:
+
+            # Remember the type
+            other_kwargs['type'] = 'list' 
+
+            # Make sure they're all strings
             for n in range(len(other_kwargs['values'])):
                 other_kwargs['values'][n] = str(other_kwargs['values'][n])
 
-            # Get the default value from default_list_index
+            # Set the default index if we should
             if default_list_index < len(other_kwargs['values']):
-                value = other_kwargs['values'][default_list_index]
+                  value = other_kwargs['values'][default_list_index]
+            else: value = other_kwargs['values'][0]
+
+        # Normal autotyping
+        elif other_kwargs['type'] == None: other_kwargs['type'] = type(value).__name__
 
         # Now that the type is determined, set up other options
         if other_kwargs['type'] in ['int', 'float']:
@@ -3364,7 +3367,15 @@ class TreeDictionary(BaseObject):
         if 'values' in other_kwargs: other_kwargs['limits'] = other_kwargs['values']
 
         # create the leaf object
+        print('CREATING', repr(value), other_kwargs)
         leaf = _pg.parametertree.Parameter.create(name=p, value=value, syncExpanded=True, **other_kwargs)
+        
+        # Debug: Check what was actually created
+        print('CREATED PARAM:', leaf.name(), 'Type:', leaf.type(), 'Value:', leaf.value())
+        if leaf.type() == 'list':
+             print('  Available values:', leaf.opts.get('values', []))
+             print('  Current value:', leaf.value())
+
         if self.name: self._tree_widgets['/'+self.name+'/'+key] = leaf
         else:         self._tree_widgets[                  key] = leaf
 
@@ -3377,30 +3388,33 @@ class TreeDictionary(BaseObject):
         if b == self._widget: b.addParameters(leaf)
         else:                 b.addChild(leaf)
 
-        # Now set the default value if any
-        if key in self._lazy_load:
-            v = self._lazy_load.pop(key)
-            self._set_value_safe(key, v, True, True)
+        # Debug: Check value after adding to tree
+        print('AFTER ADDING - Value:', leaf.value())    
 
-        # And the expanded state
-        if key+'|expanded' in self._lazy_load:
-            expanded = self._lazy_load.pop(key+'|expanded')
-            self.set_expanded(key, expanded)
+        # # Now set the default value if any
+        # if key in self._lazy_load:
+        #     v = self._lazy_load.pop(key)
+        #     self._set_value_safe(key, v, True, True)
 
-        # Connect it to autosave (will only create unique connections; will not duplicate)
-        self.connect_any_signal_changed(self.autosave)
-        if self.new_parameter_signal_changed: self.connect_signal_changed(key, self.new_parameter_signal_changed)
-        if signal_changed:                    self.connect_signal_changed(key, signal_changed)
+        # # And the expanded state
+        # if key+'|expanded' in self._lazy_load:
+        #     expanded = self._lazy_load.pop(key+'|expanded')
+        #     self.set_expanded(key, expanded)
 
-        # Make the tool tip more responsive
-        w = self.get_widget(key)
-        if 'tip' in w.param.opts:
-            w.setToolTip(0, w.param.opts['tip'])
-            w.setToolTip(1, w.param.opts['tip'])
+        # # Connect it to autosave (will only create unique connections; will not duplicate)
+        # self.connect_any_signal_changed(self.autosave)
+        # if self.new_parameter_signal_changed: self.connect_signal_changed(key, self.new_parameter_signal_changed)
+        # if signal_changed:                    self.connect_signal_changed(key, signal_changed)
 
-        # Connect to the default signal_changed function if it's specified.
-        if self.default_signal_changed:
-            self.connect_signal_changed(key, self.default_signal_changed)
+        # # Make the tool tip more responsive
+        # w = self.get_widget(key)
+        # if 'tip' in w.param.opts:
+        #     w.setToolTip(0, w.param.opts['tip'])
+        #     w.setToolTip(1, w.param.opts['tip'])
+
+        # # Connect to the default signal_changed function if it's specified.
+        # if self.default_signal_changed:
+        #     self.connect_signal_changed(key, self.default_signal_changed)
 
         return self
 
@@ -3540,7 +3554,8 @@ class TreeDictionary(BaseObject):
         Returns the value of the parameter with the specified key. If self.name
         is a string, removes '/'+self.name+'/' from the key.
         """
-        # first clean up the name
+        # first clean up the key, making sure it has the right format
+        # like .../Category/Key
         key = self._clean_up_key(self._strip(key))
 
         # now get the parameter object
@@ -3555,20 +3570,25 @@ class TreeDictionary(BaseObject):
         # handles the two versions of pyqtgraph
         bounds = None
 
-        # For lists, just make sure it's a valid value
-        if x.opts['type'] == 'list':
+        # For lists, just make sure it's a value that is in the list
+        if x.opts['type'] == 'list': 
+            
+            print('get value', value)
+            print(x.opts['values'])
+            return str(x.opts['value'])
 
-            # If it's not one from the master list, choose
-            # and return the default value.
-            if not value in x.opts['values']:
+            # JACK COMMENTED OUT AND REPLACED WITH ABOVE 2025-11-13
+            # # If it's not one from the master list, choose
+            # # and return the default value.
+            # if not value in x.opts['values']:
 
-                # Only choose a default if there exists one
-                if len(x.opts['values']):
-                    self.set_value(key, x.opts['values'][0])
-                    return x.opts['values'][0]
+            #     # Only choose a default if there exists one
+            #     if len(x.opts['values']):
+            #         self.set_value(key, x.opts['values'][0])
+            #         return x.opts['values'][0]
 
-                # Otherwise, just return None and do nothing
-                else: return None
+            #     # Otherwise, just return None and do nothing
+            #     else: return None
 
         # For strings, make sure the returned value is always a string.
         elif x.opts['type'] in ['str']: return str(value)
@@ -3730,14 +3750,25 @@ class TreeDictionary(BaseObject):
         # quit if it pooped.
         if x == None: return None
 
-        # for lists, make sure the value exists!!
+        # for lists, make sure the value exists!! 
+        # JACK UPDATED 2025-11-13
         if x.type() in ['list']:
 
+            # Get the available values list (should be strings)
+            available_values = x.opts.get('values', [])
+
+            # The items should already be converted to strings, but just to be safe...
+            available_values_str = [str(v) for v in available_values]
+            value_str = str(value)
+
             # Make sure it exists before trying to set it
-            if str(value) in list(x.forward.keys()): x.setValue(str(value))
+            if value_str in available_values_str: 
+                print('setting', value_str, available_values_str)
+                
+                x.setValue(value_str)
 
             # Otherwise default to the first key
-            else: x.setValue(list(x.forward.keys())[0])
+            else: x.setValue(available_values_str[0])
 
         # Bail to a hopeful set method for other types
         else: x.setValue(eval(x.opts['type'])(value))
@@ -5558,14 +5589,63 @@ class DataboxSaveLoad(_d.databox, GridLayout):
 
 
 if __name__ == '__main__':
+    import spinmob
+    #runfile(spinmob.__path__[0] + '/tests/test__egg.py')
+
+    # Create window
+    w = Window(autosettings_path='w')
+    t = w.add(TreeDictionary(), alignment=0)
+    t.add_parameter('Test/List', ['pants','shoes', 32])
+
+    # Create buttons
+    # b = w.add(Button('Get Fake Data'))
+    # l = w.add(Button('Loop', checkable=True))
     
-    w = Window()
-    s = w.add(TreeDictionary().set_width(200))
-    c = s.add('c', [1,'pants',3], default_list_index=2)
+    # Create tab area
+    # w.new_autorow()
+    # ts = w.add(TabArea(autosettings_path='ts'), alignment=0, column_span=10)
+    # w.set_column_stretch(4)
+    
+    # Create plotter and processor
+    # p = ts.add_tab('Data').add(DataboxPlot('*.dat','p', autoscript=4), alignment=0)
+    # a = ts.add_tab('Processor').add(DataboxProcessor(databox_source=p), alignment=0)
+    
+    # p.button_script.set_checked(True)
+    
+    # # Window close stops acquisition
+    # def close(): l.set_checked(False)
+    # w.event_close = close
+    
+    # # Initial data
+    # p[0] = [1,2,3,4]
+    # p[1] = [1,2,1,2]
+    # p[2] = [0.5,0.5,0.5,0.5]
+    # p[3] = [2,1,2,1]
+    # p[4] = [0.3,0.1,20,0.3]
+    # p.plot()
+    
+    # # New Data
+    # def get_fake_data():
+    #     p.clear()
+    #     p['t']  = _n.linspace(0,10,1000)
+    #     p['V1'] = 0.01*_n.random.normal(size=1000)
+    #     p['V2'] = _n.random.normal(size=1000)
+    #     p.plot()
+    #     a.run()
+    # b.signal_clicked.connect(get_fake_data)
+    
+    # # Loop
+    # def loop():
+    #     while l.is_checked():
+    #         get_fake_data()
+    #         w.sleep(0.25)
+    # l.signal_clicked.connect(loop)
+    
+    w.show(False)
+    # global x
+    # x = p
 
-    w.show()
-
-
+    # a.settings.get_value('Stream/Method')
 
 
 

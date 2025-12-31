@@ -95,12 +95,15 @@ class Test_egg(_ut.TestCase):
         self.d['stringy'] = 47.2
         self.assertEqual(type(self.d['stringy']), str)
         
-        # List
+        # Lists should always be stringified internally
         self.assertEqual(self.d.get_list_values('listy'), test_list_values_stringified)
         self.assertEqual(type(self.d['listy']), str)
+        print('\n\nJACK OKAY HERE WE ARE!')
         self.d['listy'] = 37.2
-        self.assertEqual(self.d['listy'], str(37.2))
-        
+        print('THEN')
+        self.assertEqual(self.d['listy'], str(37.2)) # JACK
+        print('ALL DONE')
+
         # Save, load, and make sure the values are still the same (with types)
         self.d.save()
         self.d.load()
