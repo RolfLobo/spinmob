@@ -216,7 +216,6 @@ class Test_egg(_ut.TestCase):
 
 if __name__ == "__main__":
     
-    # We pass sys.stdout to the runner to force synchronization
     _ut.main(
         argv=['first-arg-is-ignored'], 
         exit=False, 

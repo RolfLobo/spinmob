@@ -243,4 +243,10 @@ class Test_fitter(_ut.TestCase):
 
 
 if __name__ == "__main__":
-    _ut.main(failfast=True)
+    
+    _ut.main(
+        argv=['first-arg-is-ignored'], 
+        exit=False, 
+        buffer=False, 
+        #verbosity=2,
+    )
