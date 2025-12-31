@@ -3,12 +3,15 @@ import shutil   as _sh
 import os       as _os
 import sys      as _sys
 
-#from test__plot      import *
-#from test__databox   import *
-#from test__fitter    import *
-#from test__functions import *
-#from test__dialogs   import *
-from test__egg       import *
+# from test__plot      import *
+# from test__databox   import *
+# from test__fitter    import *
+# from test__functions import *
+# from test__dialogs   import *
+# from test__egg       import *
+
+import spinmob
+runfile(spinmob.__path__[0] + '/tests/test__egg.py')
 
 if _os.path.exists('egg_settings'): _sh.rmtree('egg_settings')
 

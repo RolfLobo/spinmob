@@ -2831,15 +2831,14 @@ class TreeDictionary(BaseObject):
      * all parameter names must not have self.naughty characters.
      * autosettings_path is where the settings will be saved / loaded
        from when calling self.save() and self.load(). The settings
-       file is just a databox with no data, and you can use other
-       databox files.
+       file is just a databox with no data.
      * Note: for the 'list' type, may have to specify a list of strings.
        Otherwise there will be confusion upon loading.
 
     Parameters
     ----------
     autosettings_path=None : str
-        Where this object will save its settings when self.save() and self.load()
+        Where this object will save its settings ONLY when self.save() and self.load()
         are called without a path specified. None means no settings will be
         automatically saved.
 
@@ -3305,19 +3304,18 @@ class TreeDictionary(BaseObject):
         See pyqtgraph ParameterTree for more options. Particularly useful is the
         tip='insert your text' option, which supplies a tooltip!
         """
-        
         # Check for limits (should be bounds)
         # Actually, now they went back to 'limits' for everything.
         # This is now a compatibility layer for different versions.
         if 'limits' in kwargs: kwargs['bounds'] = kwargs['limits']
-
+        
         # update the default kwargs
         other_kwargs = dict(type=None) # Set type=None by default
         other_kwargs.update(kwargs)    # Slap on the ones we specified
 
         # Special case: we send a list to value => list
         if type(value) in (list,tuple): other_kwargs['values'] = [str(v) for v in value] # Transfer it to the list
-            
+        
         # Auto typing for lists specified by either method
         if 'values' in other_kwargs:
 
@@ -3333,13 +3331,14 @@ class TreeDictionary(BaseObject):
                   value = other_kwargs['values'][default_list_index]
             else: value = other_kwargs['values'][0]
 
-        # Normal autotyping
-        elif other_kwargs['type'] == None: other_kwargs['type'] = type(value).__name__
-
+        # Normal autotyping for things like float, int, etc JACK
+        elif other_kwargs['type'] == None: 
+            other_kwargs['type'] = type(value).__name__
+            
         # Now that the type is determined, set up other options
         if other_kwargs['type'] in ['int', 'float']:
             other_kwargs['compactHeight'] = False
-
+        
         # split into (presumably existing) branches and parameter
         s = key.split('/')
 
@@ -3353,68 +3352,54 @@ class TreeDictionary(BaseObject):
 
         # create / get the branch on which to add the leaf
         b = self._find_parameter(s, create_missing=True)
-
+        
         # quit out if it pooped
         if b == None:
             self.print_message('Error: Could not create \''+key+'\'')
             return self
-
-        # JACK
-        #print('+++', repr(key), repr(value), other_kwargs)
 
         # Compatibility with old and new pyqtgraph api's. 
         # New is "limits" instead of "values" for lists
         if 'values' in other_kwargs: other_kwargs['limits'] = other_kwargs['values']
 
         # create the leaf object
-        print('CREATING', repr(value), other_kwargs)
-        leaf = _pg.parametertree.Parameter.create(name=p, value=value, syncExpanded=True, **other_kwargs)
+        # JACK! Changed value=value to default=value to avoid deprecation 2025
+        leaf = _pg.parametertree.Parameter.create(name=p, default=value, syncExpanded=True, **other_kwargs)
         
-        # Debug: Check what was actually created
-        print('CREATED PARAM:', leaf.name(), 'Type:', leaf.type(), 'Value:', leaf.value())
-        if leaf.type() == 'list':
-             print('  Available values:', leaf.opts.get('values', []))
-             print('  Current value:', leaf.value())
-
         if self.name: self._tree_widgets['/'+self.name+'/'+key] = leaf
         else:         self._tree_widgets[                  key] = leaf
-
-        # JACK
-        # print(leaf)
-        # global thing 
-        # thing = leaf
 
         # add it to the tree (different methods for root)
         if b == self._widget: b.addParameters(leaf)
         else:                 b.addChild(leaf)
-
+        
         # Debug: Check value after adding to tree
-        print('AFTER ADDING - Value:', leaf.value())    
+        #print('AFTER ADDING - Value:', leaf.value())    
 
         # # Now set the default value if any
-        # if key in self._lazy_load:
-        #     v = self._lazy_load.pop(key)
-        #     self._set_value_safe(key, v, True, True)
+        if key in self._lazy_load:
+            v = self._lazy_load.pop(key)
+            self._set_value_safe(key, v, True, True)
 
-        # # And the expanded state
-        # if key+'|expanded' in self._lazy_load:
-        #     expanded = self._lazy_load.pop(key+'|expanded')
-        #     self.set_expanded(key, expanded)
+        # And the expanded state
+        if key+'|expanded' in self._lazy_load:
+            expanded = self._lazy_load.pop(key+'|expanded')
+            self.set_expanded(key, expanded)
 
-        # # Connect it to autosave (will only create unique connections; will not duplicate)
-        # self.connect_any_signal_changed(self.autosave)
-        # if self.new_parameter_signal_changed: self.connect_signal_changed(key, self.new_parameter_signal_changed)
-        # if signal_changed:                    self.connect_signal_changed(key, signal_changed)
+        # Connect it to autosave (will only create unique connections; will not duplicate)
+        self.connect_any_signal_changed(self.autosave)
+        if self.new_parameter_signal_changed: self.connect_signal_changed(key, self.new_parameter_signal_changed)
+        if signal_changed:                    self.connect_signal_changed(key, signal_changed)
 
-        # # Make the tool tip more responsive
-        # w = self.get_widget(key)
-        # if 'tip' in w.param.opts:
-        #     w.setToolTip(0, w.param.opts['tip'])
-        #     w.setToolTip(1, w.param.opts['tip'])
-
-        # # Connect to the default signal_changed function if it's specified.
-        # if self.default_signal_changed:
-        #     self.connect_signal_changed(key, self.default_signal_changed)
+        # Make the tool tip more responsive
+        w = self.get_widget(key)
+        if 'tip' in w.param.opts:
+            w.setToolTip(0, w.param.opts['tip'])
+            w.setToolTip(1, w.param.opts['tip'])
+        
+        # Connect to the default signal_changed function if it's specified.
+        if self.default_signal_changed:
+            self.connect_signal_changed(key, self.default_signal_changed)
 
         return self
 
@@ -3432,7 +3417,7 @@ class TreeDictionary(BaseObject):
         k = base_key + "/" + parameter.name()
 
         # first add this parameter (if it has a value)
-        if not parameter.value()==None:
+        if 'value' in parameter.opts.keys():
             sorted_keys.append(k[1:])
             dictionary[sorted_keys[-1]] = parameter.value()
 
@@ -3573,22 +3558,9 @@ class TreeDictionary(BaseObject):
         # For lists, just make sure it's a value that is in the list
         if x.opts['type'] == 'list': 
             
-            print('get value', value)
-            print(x.opts['values'])
+            # print('get value', value)
+            # print(x.opts['values'])
             return str(x.opts['value'])
-
-            # JACK COMMENTED OUT AND REPLACED WITH ABOVE 2025-11-13
-            # # If it's not one from the master list, choose
-            # # and return the default value.
-            # if not value in x.opts['values']:
-
-            #     # Only choose a default if there exists one
-            #     if len(x.opts['values']):
-            #         self.set_value(key, x.opts['values'][0])
-            #         return x.opts['values'][0]
-
-            #     # Otherwise, just return None and do nothing
-            #     else: return None
 
         # For strings, make sure the returned value is always a string.
         elif x.opts['type'] in ['str']: return str(value)
@@ -3751,7 +3723,6 @@ class TreeDictionary(BaseObject):
         if x == None: return None
 
         # for lists, make sure the value exists!! 
-        # JACK UPDATED 2025-11-13
         if x.type() in ['list']:
 
             # Get the available values list (should be strings)
@@ -3763,7 +3734,7 @@ class TreeDictionary(BaseObject):
 
             # Make sure it exists before trying to set it
             if value_str in available_values_str: 
-                print('setting', value_str, available_values_str)
+                #print('setting', value_str, available_values_str)
                 
                 x.setValue(value_str)
 
@@ -5589,15 +5560,18 @@ class DataboxSaveLoad(_d.databox, GridLayout):
 
 
 if __name__ == '__main__':
+    
     import spinmob
-    #runfile(spinmob.__path__[0] + '/tests/test__egg.py')
+    runfile(spinmob.__path__[0] + '/tests/test__egg.py')
 
     # Create window
-    w = Window(autosettings_path='w')
-    t = w.add(TreeDictionary(), alignment=0)
-    t.add_parameter('Test/List', ['pants','shoes', 32])
+    # w = Window(autosettings_path='w')
+    # t = w.add(TreeDictionary(autosettings_path='t'), alignment=0)
+    # t.add_parameter('Test/List', ['pants','shoes', 32])
+    # t.add_parameter('Test/Numnum', 42.0)
+    # t.load()
 
-    # Create buttons
+    # # Create buttons
     # b = w.add(Button('Get Fake Data'))
     # l = w.add(Button('Loop', checkable=True))
     
@@ -5641,7 +5615,7 @@ if __name__ == '__main__':
     #         w.sleep(0.25)
     # l.signal_clicked.connect(loop)
     
-    w.show(False)
+    #w.show(False)
     # global x
     # x = p
 
