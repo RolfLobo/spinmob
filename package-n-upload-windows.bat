@@ -10,14 +10,17 @@ if exist dist\ (
 )
 
 :: Ensure modern build tools are present
+echo
 echo Updating build tools...
 python -m pip install --upgrade pip build twine
 
 :: Build the package (creates sdist and wheel)
+echo
 echo Building spinmob...
 python -m build
 
 :: Upload to PyPI
+echo
 echo Uploading to PyPI via Twine...
 python -m twine upload dist/*
 

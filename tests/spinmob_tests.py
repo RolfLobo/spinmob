@@ -16,4 +16,5 @@ _ut.main(
         argv=['first-arg-is-ignored'], 
         exit=False, 
         buffer=False, 
+        verbosity=1
     )

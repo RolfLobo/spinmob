@@ -2885,6 +2885,243 @@ class TreeDictionary(BaseObject):
         # Load the previous settings (if any)
         self.load()
 
+    def add_parameter(self, key='test', value=42.0, default_list_index=0, signal_changed=None, **kwargs):
+        """
+        Adds a parameter "leaf" to the tree. If self.default_signal_changed is
+        a function, this runs self.connect_signal_changed(key, self.default_signal_changed).
+
+        Parameters
+        ----------
+
+        key='test'
+            The key of the leaf. It should be a string of the form
+            "branch1/branch2/parametername" and will be nested as indicated.
+
+        value=42.0
+            Value of the leaf. If nothing else is specified, the parameter
+            will be assumed to be the type of the value, so specifying 0 will
+            result in an int, 0.0 will be a float, [] will be a list, etc.
+
+        default_list_index=0
+            When setting value=[], use this to specify the default selected
+            list index (an integer)
+
+        signal_changed=None
+            Optional function to which signal_changed for this parameter will connect.
+
+
+        Common Keyword Arguments
+        ------------------------
+        format
+            Should be a string, used by a .format() call when displaying a number value.
+            For example, format='{value:.9f}' will give 9 zeros after the decimal
+            for the value. This follows the "SpinBox" format option, there are more
+            arguments than just value:
+
+                value - the unscaled value of the spin box
+
+                prefix - the prefix string
+
+                prefixGap - a single space if a prefix is present, or an empty string otherwise
+
+                suffix - the suffix string
+
+                scaledValue - the scaled value to use when an SI prefix is present
+
+                siPrefix - the SI prefix string (if any), or an empty string if this feature has been disabled
+
+                suffixGap - a single space if a suffix is present, or an empty string otherwise.
+
+        type=None
+            If set to None, type will be automatically set to type(value).__name__.
+            This will not work for all data types, but is
+            a nice shortcut for floats, ints, strings, etc.
+            If it doesn't work, just specify the type manually (see below).
+
+        values
+            Not used by default. Only relevant for type='list', or if you simply
+            specified a list for this keyword argument, and should then
+            be a list of possible values. If you go this route, you can use
+            the value argument above to specify which item is selected by
+            default.
+
+        step=1
+            Step size of incrementing numbers
+
+        dec=False
+            Set to True to enable decade increments.
+        
+        bounds
+            Not used by default. Should be a 2-element tuple or list used to
+            bound numerical values.
+
+        default
+            Not used by default. Used to specify the default numerical value
+
+        siPrefix=False
+            Set to True to display units on numbers
+
+        suffix
+            Not used by default. Used to add unit labels to elements.
+
+        readonly=False
+            Whether the user can edit the values.
+
+
+        See pyqtgraph ParameterTree for more options. Particularly useful is the
+        tip='insert your text' option, which supplies a tooltip!
+        """
+        # Check for limits
+        # Actually, now they went back to 'limits' for everything.
+        # This is now a compatibility layer to duplicate information for different versions.
+        # As of pyqtgraph v0.14, they now use 'limits' for values of a list as well :(
+        if 'bounds' in kwargs: kwargs['limits'] = kwargs['bounds']
+        
+        # Update the default kwargs
+        other_kwargs = dict(type=None) # Set type=None by default
+        other_kwargs.update(kwargs)    # Slap on the ones we already specified
+
+        # Special case: we send a list to value => list
+        # Note since v0.14 they now use 'limits' as a catch all for bounds or list values :(
+        if type(value) in (list,tuple): other_kwargs['values'] = [str(v) for v in value] # Transfer it to the list
+        
+        # Auto typing for lists specified by either method
+        if 'values' in other_kwargs:
+
+            # Remember the type
+            other_kwargs['type'] = 'list' 
+
+            # Compatibility layer, v0.14+ uses "limits" instead of "values" for lists :(
+            other_kwargs['limits'] = other_kwargs.pop('values')
+
+            # Make sure they're all strings
+            for n in range(len(other_kwargs['limits'])):
+                other_kwargs['limits'][n] = str(other_kwargs['limits'][n])
+
+            # Set the default index if we should
+            if default_list_index < len(other_kwargs['limits']):
+                  value = other_kwargs['limits'][default_list_index]
+            else: value = other_kwargs['limits'][0]
+
+        # Normal autotyping for things like float, int, etc JACK
+        elif other_kwargs['type'] == None: 
+            other_kwargs['type'] = type(value).__name__
+            
+        # Now that the type is determined, set up other options
+        if other_kwargs['type'] in ['int', 'float']:
+            other_kwargs['compactHeight'] = False
+        
+        # split into (presumably existing) branches and parameter
+        s = key.split('/')
+
+        # make sure it doesn't already exist
+        if not self._find_parameter(s, quiet=True) == None:
+            self.print_message("Error: '"+key+"' already exists.\n"+str(self))
+            return self
+
+        # get the leaf key off the list.
+        p = s.pop(-1)
+
+        # create / get the branch on which to add the leaf
+        b = self._find_parameter(s, create_missing=True)
+        
+        # quit out if it pooped
+        if b == None:
+            self.print_message('Error: Could not create \''+key+'\'')
+            return self
+
+        # create the leaf object
+        # Changed value=value to default=value to avoid deprecation 2025
+        leaf = _pg.parametertree.Parameter.create(name=p, default=value, syncExpanded=True, **other_kwargs)
+        
+        if self.name: self._tree_widgets['/'+self.name+'/'+key] = leaf
+        else:         self._tree_widgets[                  key] = leaf
+
+        # add it to the tree (different methods for root)
+        if b == self._widget: b.addParameters(leaf)
+        else:                 b.addChild(leaf)
+        
+        # Debug: Check value after adding to tree
+        #print('AFTER ADDING - Value:', leaf.value())    
+
+        # # Now set the default value if any
+        if key in self._lazy_load:
+            v = self._lazy_load.pop(key)
+            self._set_value_safe(key, v, True, True)
+
+        # And the expanded state
+        if key+'|expanded' in self._lazy_load:
+            expanded = self._lazy_load.pop(key+'|expanded')
+            self.set_expanded(key, expanded)
+
+        # Connect it to autosave (will only create unique connections; will not duplicate)
+        self.connect_any_signal_changed(self.autosave)
+        if self.new_parameter_signal_changed: self.connect_signal_changed(key, self.new_parameter_signal_changed)
+        if signal_changed:                    self.connect_signal_changed(key, signal_changed)
+
+        # Make the tool tip more responsive
+        w = self.get_widget(key)
+        if 'tip' in w.param.opts:
+            w.setToolTip(0, w.param.opts['tip'])
+            w.setToolTip(1, w.param.opts['tip'])
+        
+        # Connect to the default signal_changed function if it's specified.
+        if self.default_signal_changed:
+            self.connect_signal_changed(key, self.default_signal_changed)
+
+        return self
+
+    add = add_parameter
+
+    def add_button(self, key, checkable=False, checked=False, tip=None, **kwargs):
+        """
+        Adds (and returns) a button at the specified location.
+
+        Extra keyword arguments are sent to Button()
+        """
+
+        # first clean up the key
+        key = self._clean_up_key(key)
+
+        # split into (presumably existing) branches and parameter
+        s = key.split('/')
+
+        # make sure it doesn't already exist
+        if not self._find_parameter(s, quiet=True) == None:
+            self.print_message("ERROR: '"+key+"' already exists.\n"+str(self))
+            return None
+
+        # get the leaf key off the list.
+        p = s.pop(-1)
+
+        # create / get the branch on which to add the leaf
+        b = self._find_parameter(s, create_missing=True)
+
+        # quit out if it pooped
+        if b == None: return None
+
+        # create the leaf object
+        ap = _pg.parametertree.Parameter.create(name=p, type='action', syncExpanded=True)
+        self._tree_widgets[self._unstrip(key)] = ap
+
+        # add it to the tree (different methods for root)
+        if b == self._widget: b.addParameters(ap)
+        else:                 b.addChild(ap)
+
+        # modify the existing class to fit our conventions
+        ap.signal_clicked = ap.sigActivated
+
+        # Now set the default value if any
+        if key in self._lazy_load:
+            v = self._lazy_load.pop(key)
+            self._set_value_safe(key, v, True, True)
+
+        # Connect it to autosave (will only create unique connections)
+        self.connect_any_signal_changed(self.autosave)
+
+        return Button(key, checkable, checked, list(ap.items.keys())[0].button, tip=tip, **kwargs)
+
+
     def __repr__(self):
         """
         How do display this object.
@@ -3170,240 +3407,7 @@ class TreeDictionary(BaseObject):
         for n in self.naughty: key = key.replace(n, '_')
         return key
 
-    def add_button(self, key, checkable=False, checked=False, tip=None, **kwargs):
-        """
-        Adds (and returns) a button at the specified location.
 
-        Extra keyword arguments are sent to Button()
-        """
-
-        # first clean up the key
-        key = self._clean_up_key(key)
-
-        # split into (presumably existing) branches and parameter
-        s = key.split('/')
-
-        # make sure it doesn't already exist
-        if not self._find_parameter(s, quiet=True) == None:
-            self.print_message("ERROR: '"+key+"' already exists.\n"+str(self))
-            return None
-
-        # get the leaf key off the list.
-        p = s.pop(-1)
-
-        # create / get the branch on which to add the leaf
-        b = self._find_parameter(s, create_missing=True)
-
-        # quit out if it pooped
-        if b == None: return None
-
-        # create the leaf object
-        ap = _pg.parametertree.Parameter.create(name=p, type='action', syncExpanded=True)
-        self._tree_widgets[self._unstrip(key)] = ap
-
-        # add it to the tree (different methods for root)
-        if b == self._widget: b.addParameters(ap)
-        else:                 b.addChild(ap)
-
-        # modify the existing class to fit our conventions
-        ap.signal_clicked = ap.sigActivated
-
-        # Now set the default value if any
-        if key in self._lazy_load:
-            v = self._lazy_load.pop(key)
-            self._set_value_safe(key, v, True, True)
-
-        # Connect it to autosave (will only create unique connections)
-        self.connect_any_signal_changed(self.autosave)
-
-        return Button(key, checkable, checked, list(ap.items.keys())[0].button, tip=tip, **kwargs)
-
-    def add_parameter(self, key='test', value=42.0, default_list_index=0, signal_changed=None, **kwargs):
-        """
-        Adds a parameter "leaf" to the tree. If self.default_signal_changed is
-        a function, this runs self.connect_signal_changed(key, self.default_signal_changed).
-
-        Parameters
-        ----------
-
-        key='test'
-            The key of the leaf. It should be a string of the form
-            "branch1/branch2/parametername" and will be nested as indicated.
-
-        value=42.0
-            Value of the leaf. If nothing else is specified, the parameter
-            will be assumed to be the type of the value, so specifying 0 will
-            result in an int, 0.0 will be a float, [] will be a list, etc.
-
-        default_list_index=0
-            When setting value=[], use this to specify the default selected
-            list index (an integer)
-
-        signal_changed=None
-            Optional function to which signal_changed for this parameter will connect.
-
-
-        Common Keyword Arguments
-        ------------------------
-        format
-            Should be a string, used by a .format() call when displaying a number value.
-            For example, format='{value:.9f}' will give 9 zeros after the decimal
-            for the value. This follows the "SpinBox" format option, there are more
-            arguments than just value:
-
-                value - the unscaled value of the spin box
-
-                prefix - the prefix string
-
-                prefixGap - a single space if a prefix is present, or an empty string otherwise
-
-                suffix - the suffix string
-
-                scaledValue - the scaled value to use when an SI prefix is present
-
-                siPrefix - the SI prefix string (if any), or an empty string if this feature has been disabled
-
-                suffixGap - a single space if a suffix is present, or an empty string otherwise.
-
-        type=None
-            If set to None, type will be automatically set to type(value).__name__.
-            This will not work for all data types, but is
-            a nice shortcut for floats, ints, strings, etc.
-            If it doesn't work, just specify the type manually (see below).
-
-        values
-            Not used by default. Only relevant for type='list', or if you simply
-            specified a list for this keyword argument, and should then
-            be a list of possible values. If you go this route, you can use
-            the value argument above to specify which item is selected by
-            default.
-
-        step=1
-            Step size of incrementing numbers
-
-        dec=False
-            Set to True to enable decade increments.
-        
-        limits
-            Not used by default. Should be a 2-element tuple or list used to
-            bound numerical values.
-
-        default
-            Not used by default. Used to specify the default numerical value
-
-        siPrefix=False
-            Set to True to display units on numbers
-
-        suffix
-            Not used by default. Used to add unit labels to elements.
-
-        readonly=False
-            Whether the user can edit the values.
-
-
-        See pyqtgraph ParameterTree for more options. Particularly useful is the
-        tip='insert your text' option, which supplies a tooltip!
-        """
-        # Check for limits (should be bounds)
-        # Actually, now they went back to 'limits' for everything.
-        # This is now a compatibility layer for different versions.
-        if 'limits' in kwargs: kwargs['bounds'] = kwargs['limits']
-        
-        # update the default kwargs
-        other_kwargs = dict(type=None) # Set type=None by default
-        other_kwargs.update(kwargs)    # Slap on the ones we specified
-
-        # Special case: we send a list to value => list
-        if type(value) in (list,tuple): other_kwargs['values'] = [str(v) for v in value] # Transfer it to the list
-        
-        # Auto typing for lists specified by either method
-        if 'values' in other_kwargs:
-
-            # Remember the type
-            other_kwargs['type'] = 'list' 
-
-            # Make sure they're all strings
-            for n in range(len(other_kwargs['values'])):
-                other_kwargs['values'][n] = str(other_kwargs['values'][n])
-
-            # Set the default index if we should
-            if default_list_index < len(other_kwargs['values']):
-                  value = other_kwargs['values'][default_list_index]
-            else: value = other_kwargs['values'][0]
-
-        # Normal autotyping for things like float, int, etc JACK
-        elif other_kwargs['type'] == None: 
-            other_kwargs['type'] = type(value).__name__
-            
-        # Now that the type is determined, set up other options
-        if other_kwargs['type'] in ['int', 'float']:
-            other_kwargs['compactHeight'] = False
-        
-        # split into (presumably existing) branches and parameter
-        s = key.split('/')
-
-        # make sure it doesn't already exist
-        if not self._find_parameter(s, quiet=True) == None:
-            self.print_message("Error: '"+key+"' already exists.\n"+str(self))
-            return self
-
-        # get the leaf key off the list.
-        p = s.pop(-1)
-
-        # create / get the branch on which to add the leaf
-        b = self._find_parameter(s, create_missing=True)
-        
-        # quit out if it pooped
-        if b == None:
-            self.print_message('Error: Could not create \''+key+'\'')
-            return self
-
-        # Compatibility with old and new pyqtgraph api's. 
-        # New is "limits" instead of "values" for lists
-        if 'values' in other_kwargs: other_kwargs['limits'] = other_kwargs['values']
-
-        # create the leaf object
-        # JACK! Changed value=value to default=value to avoid deprecation 2025
-        leaf = _pg.parametertree.Parameter.create(name=p, default=value, syncExpanded=True, **other_kwargs)
-        
-        if self.name: self._tree_widgets['/'+self.name+'/'+key] = leaf
-        else:         self._tree_widgets[                  key] = leaf
-
-        # add it to the tree (different methods for root)
-        if b == self._widget: b.addParameters(leaf)
-        else:                 b.addChild(leaf)
-        
-        # Debug: Check value after adding to tree
-        #print('AFTER ADDING - Value:', leaf.value())    
-
-        # # Now set the default value if any
-        if key in self._lazy_load:
-            v = self._lazy_load.pop(key)
-            self._set_value_safe(key, v, True, True)
-
-        # And the expanded state
-        if key+'|expanded' in self._lazy_load:
-            expanded = self._lazy_load.pop(key+'|expanded')
-            self.set_expanded(key, expanded)
-
-        # Connect it to autosave (will only create unique connections; will not duplicate)
-        self.connect_any_signal_changed(self.autosave)
-        if self.new_parameter_signal_changed: self.connect_signal_changed(key, self.new_parameter_signal_changed)
-        if signal_changed:                    self.connect_signal_changed(key, signal_changed)
-
-        # Make the tool tip more responsive
-        w = self.get_widget(key)
-        if 'tip' in w.param.opts:
-            w.setToolTip(0, w.param.opts['tip'])
-            w.setToolTip(1, w.param.opts['tip'])
-        
-        # Connect to the default signal_changed function if it's specified.
-        if self.default_signal_changed:
-            self.connect_signal_changed(key, self.default_signal_changed)
-
-        return self
-
-    add = add_parameter
 
 
     def _get_parameter_dictionary(self, base_key, dictionary, sorted_keys, parameter):
@@ -3552,9 +3556,6 @@ class TreeDictionary(BaseObject):
         # get the value and test the bounds
         value  = x.value()
 
-        # handles the two versions of pyqtgraph
-        bounds = None
-
         # For lists, just make sure it's a value that is in the list
         if x.opts['type'] == 'list': 
             
@@ -3563,16 +3564,16 @@ class TreeDictionary(BaseObject):
             return str(x.opts['value'])
 
         # For strings, make sure the returned value is always a string.
-        elif x.opts['type'] in ['str']: return str(value)
+        if x.opts['type'] in ['str']: return str(value)
 
         # Otherwise assume it is a value with bounds or limits (depending on
         # the version of pyqtgraph)
-        else:
-            if   'limits' in x.opts: bounds = x.opts['limits']
-            elif 'bounds' in x.opts: bounds = x.opts['bounds']
-            if not bounds == None:
-                if not bounds[1]==None and value > bounds[1]: value = bounds[1]
-                if not bounds[0]==None and value < bounds[0]: value = bounds[0]
+        bounds = None
+        if   'limits' in x.opts: bounds = x.opts['limits']
+        elif 'bounds' in x.opts: bounds = x.opts['bounds']
+        if not bounds == None:
+            if not bounds[1]==None and value > bounds[1]: value = bounds[1]
+            if not bounds[0]==None and value < bounds[0]: value = bounds[0]
 
         # return it
         return value
@@ -3594,7 +3595,7 @@ class TreeDictionary(BaseObject):
             return
 
         # Return a copy of the list values
-        return list(self.get_param(key).opts['values'])
+        return list(self.get_param(key).opts['limits'])
 
     def get_list_index(self, key):
         """
@@ -3682,7 +3683,7 @@ class TreeDictionary(BaseObject):
         block_all_signals=False : bool
             If True, try to block ALL signals while setting.
         """
-        self.set_value(key, self.get_param(key).opts['values'][n],
+        self.set_value(key, self.get_param(key).opts['limits'][n],
                        ignore_error=ignore_error,
                        block_key_signals=block_key_signals,
                        block_all_signals=block_all_signals)
@@ -3726,7 +3727,7 @@ class TreeDictionary(BaseObject):
         if x.type() in ['list']:
 
             # Get the available values list (should be strings)
-            available_values = x.opts.get('values', [])
+            available_values = x.opts.get('limits', [])
 
             # The items should already be converted to strings, but just to be safe...
             available_values_str = [str(v) for v in available_values]

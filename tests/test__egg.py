@@ -220,4 +220,5 @@ if __name__ == "__main__":
         argv=['first-arg-is-ignored'], 
         exit=False, 
         buffer=False, 
+        verbosity=2,
     )
