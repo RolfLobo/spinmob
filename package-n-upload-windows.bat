@@ -1,9 +1,25 @@
-call %userprofile%\Miniconda3\Scripts\activate.bat %userprofile%\Miniconda3
+call E:\Python\Scripts\activate.bat
 
-del /Q /F dist\*
-python setup.py sdist
+@echo off
+setlocal
 
-pip install twine
-twine upload dist\*
+:: Clean up previous builds
+if exist dist\ (
+    echo Cleaning old builds...
+    del /Q /F dist\*
+)
 
-@pause
+:: Ensure modern build tools are present
+echo Updating build tools...
+python -m pip install --upgrade pip build twine
+
+:: Build the package (creates sdist and wheel)
+echo Building spinmob...
+python -m build
+
+:: Upload to PyPI
+echo Uploading to PyPI via Twine...
+python -m twine upload dist/*
+
+echo Done!
+pause
