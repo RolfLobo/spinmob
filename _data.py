@@ -3211,7 +3211,7 @@ class fitter():
         # this will temporarily fix the deprecation warning
         import warnings
         import matplotlib.cbook
-        warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
+        #warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 
         _s.tweaks.raise_figure_window(data_set+self['first_figure'])
         return _p.ginput(**kwargs)
