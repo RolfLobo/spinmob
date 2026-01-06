@@ -2971,6 +2971,11 @@ class TreeDictionary(BaseObject):
         See pyqtgraph ParameterTree for more options. Particularly useful is the
         tip='insert your text' option, which supplies a tooltip!
         """
+        # Spinmob is freezing its api. If you used limits, warn
+        if 'limits' in kwargs: 
+            print('WARNING: Please use bounds instead of limits to place bounds on numbers.')
+            kwargs['bounds'] = kwargs['limits']
+
         # Check for limits
         # Actually, now they went back to 'limits' for everything.
         # This is now a compatibility layer to duplicate information for different versions.
