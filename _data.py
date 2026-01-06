@@ -1936,11 +1936,11 @@ class fitter():
         if len(self._xdatas_given)==0 or len(self._ydatas_given)==0 or len(self.functions)==0:
             s = s + "\nINPUT PARAMETERS\n"
 
-        # If we do have data, give mor information
+        # If we do have data, give more information
         else:
             s = s + "\nINPUT PARAMETERS (reduced chi^2 = {:s}, {} DOF)\n".format(
                 self._format_value_error(self.get_reduced_chi_squared(self.p_in),
-                                         _n.sqrt(_n.divide(2.0,self.get_degrees_of_freedom()))),
+                                         self.get_reduced_chi_squared_error()),
                         self.get_degrees_of_freedom())
 
         # Always print the guess parameters
@@ -1956,7 +1956,7 @@ class fitter():
         # Print out the fit results
         if self.results and hasattr(self.results, 'covar'):
             s = s + "\nFIT RESULTS (reduced chi^2 = {:s}, {:d} DOF)\n".format(
-                    self._format_value_error(self.get_reduced_chi_squared(), _n.sqrt(_n.divide(2.0,self.get_degrees_of_freedom()))),
+                    self._format_value_error(self.get_reduced_chi_squared(), self.get_reduced_chi_squared_error()),
                     int(self.get_degrees_of_freedom()))
             for pname in self.p_fit:
                 if self.p_in[pname].vary:
@@ -2716,6 +2716,15 @@ class fitter():
         # Safe divider.
         return _n.divide(self.get_chi_squared(p), self.get_degrees_of_freedom())
 
+    def get_reduced_chi_squared_error(self):
+        """
+        Returns the standard deviation of the reduced chi squared distribution.
+        """
+        if self.get_degrees_of_freedom() > 0: 
+            return _n.sqrt(_n.divide(2.0,self.get_degrees_of_freedom()))
+        else: 
+            return _n.nan
+
     def autoscale_eydata(self):
         """
         Rescales the error so the next fit will give reduced chi squareds of 1.
@@ -3005,7 +3014,7 @@ class fitter():
             if self.results and hasattr(self.results, 'covar'):
                 t1 = "Fit: "+', '.join(fit_strings) + \
                     ', $\chi^2_r$={} ({} DOF)'.format(
-                        self._format_value_error(self.get_reduced_chi_squared(), _n.sqrt(_n.divide(2.0,self.get_degrees_of_freedom())), '$\pm$'),
+                        self._format_value_error(self.get_reduced_chi_squared(), self.get_reduced_chi_squared_error(), '$\pm$'),
                         int(self.get_degrees_of_freedom()))
                 t = t + '\n' + _textwrap.fill(t1, wrap, subsequent_indent=indent)
 
@@ -3327,14 +3336,17 @@ def load_multiple(paths=None, first_data_line="auto", filters="*.*", text="Selec
 
 if __name__ == '__main__':
 
+    import spinmob
+    runfile(spinmob.__path__[0] + '/tests/test__databox.py')
+
 #    _s.plot.xy.function()
 #    _s.tweaks.auto_zoom()
 #    a = _s.pylab.gca()
 
-    # Load a test file and fit it, making sure "f" is defined at each step.
-    f = fitter(xmin=2, plot_guess_zoom=True, plot_all_data=True)
-    f.set_data()
-    f.set_functions('stuff*cos(x*other_stuff)+final_stuff', 'stuff, other_stuff, final_stuff', bg='final_stuff')
-    f.fit()
+    # # Load a test file and fit it, making sure "f" is defined at each step.
+    # f = fitter(xmin=2, plot_guess_zoom=True, plot_all_data=True)
+    # f.set_data()
+    # f.set_functions('stuff*cos(x*other_stuff)+final_stuff', 'stuff, other_stuff, final_stuff', bg='final_stuff')
+    # f.fit()
 
 

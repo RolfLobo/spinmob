@@ -82,4 +82,8 @@ class Test_plot_functions(_ut.TestCase):
         
 
 if __name__ == "__main__":
-    _ut.main()
+    _ut.main(
+        argv=['first-arg-is-ignored'], 
+        exit=False, 
+        buffer=False, 
+    )

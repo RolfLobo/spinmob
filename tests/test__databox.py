@@ -442,4 +442,10 @@ class Test_databox(_ut.TestCase):
         _s.data.load_multiple(text='CANCEL ME')
 
         
-if __name__ == "__main__": _ut.main()
+if __name__ == "__main__": 
+    
+    _ut.main(
+        argv=['first-arg-is-ignored'], 
+        exit=False, 
+        buffer=False, 
+    )

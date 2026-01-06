@@ -70,7 +70,7 @@ class colormap():
 
         # make sure the file exists
         if not _os.path.exists(path):
-            print("load_colormap(): Colormap '"+name+"' does not exist. Creating.")
+            #print("load_colormap(): Colormap '"+name+"' does not exist. Creating.")
             self.save_colormap(name)
             return
 

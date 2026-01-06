@@ -1,5 +1,6 @@
-__version__ = '3.11.0' # Keep this on the first line so it's easy for __init__.py to grab.
-
+__version__ = '3.13.4' # Keep this on the first line so it's easy for __init__.py to grab.
+# We now match the first two spinmob version numbers to the python version 
+# against which it is tested. The last digit is incremented for spinmob changes.
 
 
 from setuptools import setup
@@ -31,6 +32,6 @@ setup(name           = 'spinmob',
           "matplotlib",
           "lmfit",
           "pyopengl",
-          "pyqtgraph>=0.11",
+          "pyqtgraph>=0.14",
           ],
      )

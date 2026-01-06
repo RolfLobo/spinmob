@@ -233,7 +233,7 @@ class Test_functions(_ut.TestCase):
                 ns.append(n)
                 
             # Update the user
-            if n in print_me: print('Regular variance', n, ' should = 1 =', vs[-1])
+            #if n in print_me: print('Regular variance', n, ' should = 1 =', vs[-1])
         
         sm.pylab.figure(77)
         sm.plot.xy.data(ns, [vs, sigma2s], 
@@ -274,7 +274,7 @@ class Test_functions(_ut.TestCase):
                 
             # Get the variance and chi^2 after having settled
             vs.append(_n.mean(a.variance_sample))
-            print('Tau =', tau, 'Variance should = 1 =', vs[-1])
+            #print('Tau =', tau, 'Variance should = 1 =', vs[-1])
 
         sm.pylab.figure(77)
         sm.plot.xy.data(taus, [vs], 
@@ -284,4 +284,10 @@ class Test_functions(_ut.TestCase):
             
             
 
-if __name__ == "__main__": _ut.main()
+if __name__ == "__main__": 
+    
+    _ut.main(
+        argv=['first-arg-is-ignored'], 
+        exit=False, 
+        buffer=False, 
+    )

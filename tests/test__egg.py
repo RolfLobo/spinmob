@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os       as _os
+import sys      as _sys
 import spinmob  as _s
 import unittest as _ut
 import shutil   as _sh
@@ -53,21 +54,22 @@ class Test_egg(_ut.TestCase):
         
         test_list_values = [42, 'test', 'pants', 37.2, dict(stuff='otherstuff')]
         test_list_values_stringified = [str(42), 'test', 'pants', str(37.2), str(dict(stuff='otherstuff'))]
-        
+
         # Create the TreeDictionary
-        self.d = _e.gui.TreeDictionary('pants.txt')
+        self.d = _e.gui.TreeDictionary(autosettings_path='pants.txt')
         
         # Make sure the autosettings path is right.
         self.assertEqual(self.d._autosettings_path, 'pants.txt')
         
         # Create some different value types
         self.d.add_button('button')
-        self.d.add_parameter('booly',   value=False)
-        self.d.add_parameter('inty',    value=42)
+        self.d.add_parameter('booly', value=False)
+        
+        self.d.add_parameter('inty',  value=42)
         self.d.add_parameter('floaty',  value=42.0)
         self.d.add_parameter('stringy', value=574,    type='str')
         self.d.add_parameter('listy',   value='test', type='list', values=test_list_values)
-        
+
         # Make sure the get-value returns the right types
         
         # Bool stuff
@@ -95,11 +97,11 @@ class Test_egg(_ut.TestCase):
         self.d['stringy'] = 47.2
         self.assertEqual(type(self.d['stringy']), str)
         
-        # List
+        # Lists should always be stringified internally
         self.assertEqual(self.d.get_list_values('listy'), test_list_values_stringified)
         self.assertEqual(type(self.d['listy']), str)
         self.d['listy'] = 37.2
-        self.assertEqual(self.d['listy'], str(37.2))
+        self.assertEqual(self.d['listy'], str(37.2)) # JACK
         
         # Save, load, and make sure the values are still the same (with types)
         self.d.save()
@@ -159,7 +161,6 @@ class Test_egg(_ut.TestCase):
         self.assertEqual(self.d['a'], 1)
         
     def test_DataboxPlot_DataboxProcessor(self):
-        
         # Create window
         w = _g.Window(autosettings_path='w')
         
@@ -214,7 +215,10 @@ class Test_egg(_ut.TestCase):
       
 
 if __name__ == "__main__":
-    _ut.main()
     
-    self = Test_egg()
-    
+    _ut.main(
+        argv=['first-arg-is-ignored'], 
+        exit=False, 
+        buffer=False, 
+        verbosity=2,
+    )
